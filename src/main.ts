@@ -1,6 +1,9 @@
 import { KaboomCtx } from "kaboom";
 import k from "./kaboomCtx";
 import { drawTile, fetchMapData } from "./utils";
+import { makeSamurai } from "./entities/samurai";
+import { Entity } from "./types";
+import { makeNinja } from "./entities/ninja";
 
 //arena/background/decorations sprites
 k.loadSprite(
@@ -73,19 +76,60 @@ k.loadSprite("samurai", "./assets/entities/samurai.png", {
   },
 });
 
+k.loadSprite("ninja", "./assets/entities/ninja.png", {
+  sliceX: 8,
+  sliceY: 8,
+  anims: {
+    idle: {
+      from: 32,
+      to: 35,
+      loop: true,
+    },
+    run: {
+      from: 48,
+      to: 55,
+      loop: true,
+    },
+    attack: {
+      from: 0,
+      to: 3,
+    },
+    death: {
+      from: 16,
+      to: 22,
+    },
+    hit: {
+      from: 56,
+      to: 58,
+    },
+    jump: {
+      from: 40,
+      to: 41,
+      loop: true,
+    },
+    fall: {
+      from: 24,
+      to: 25,
+      loop: true,
+    },
+  },
+});
+
 //main logic -- gameloop
 async function arena(k : KaboomCtx){
+  k.setGravity(2000);
   k.add([k.sprite("background-layer-1"), k.pos(0, 0), k.scale(4), k.fixed()]);
   k.add([k.sprite("background-layer-2"), k.pos(0, 0), k.scale(4), k.fixed()]);
   k.add([k.sprite("background-layer-3"), k.pos(0, 0), k.scale(4), k.fixed()]);
   const {layers, tilewidth, tileheight} = await fetchMapData("./maps/arena.json");
   const map = k.add([k.pos(0, 0)]);
+  const entities: {[key: string]: Entity | null} = {
+    player1:null,
+    player2:null,
+  };
   
   for(const layer of layers){
-    if (
-      layer.name === "Boundaries" && 
-      layer.type === "objectgroup"
-    ){
+    if (layer.name === "Boundaries" && layer.type === "objectgroup"){
       for (const object of layer.objects) {
         map.add([
           k.area({
@@ -98,16 +142,13 @@ async function arena(k : KaboomCtx){
       continue;
     }
 
-    if(
-      layer.name ==="DecorationSpwanPoint" &&
-      layer.type ==="objectgroup"
-    ){
+    if(layer.name ==="DecorationSpwanPoint" &&layer.type ==="objectgroup"){
       for(const obj of layer.objects){
         switch(obj.name){
           case "shop":
             map.add([
               k.sprite("shop", {anim: "default"}),
-              k.pos(obj.x - 6, obj.y),
+              k.pos(obj.x, obj.y),
               k.area(),
               k.anchor("center"),
             ]);
@@ -115,7 +156,7 @@ async function arena(k : KaboomCtx){
           case "fence-1":
             map.add([
               k.sprite("fence-1"),
-              k.pos(obj.x, obj.y + 7),
+              k.pos(obj.x, obj.y + 6),
               k.area(),
               k.anchor("center"),
             ]);
@@ -126,11 +167,19 @@ async function arena(k : KaboomCtx){
       continue;
     }
     
-    if (
-      layer.name ==="SpwanPoints" && 
-      layer.type ==="objectgroup"
-    ){
-      //TODO
+    if (layer.name ==="SpwanPoints" && layer.type ==="objectgroup"){
+      for(const obj of layer.objects){
+        switch(obj.name){
+          case "player-1":
+            entities.player1 = makeSamurai(k,map,k.vec2(obj.x,obj.y))
+            break;
+          case "player-2":
+            entities.player2 = makeNinja(k, map,k.vec2(obj.x,obj.y))
+            break;
+          default:
+        }
+      }
+      continue;
     }
 
     if (layer.type === "tilelayer"){
@@ -140,6 +189,10 @@ async function arena(k : KaboomCtx){
 
   k.camPos(k.center().x - 450, k.center().y - 160);
   k.camScale(k.vec2(4));
+
+
+  entities.player1?.setControls();
+  entities.player2?.setControls();
 }
 
 k.scene("Arena", () => arena(k));
